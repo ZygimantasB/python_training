@@ -35,6 +35,6 @@ async def main():
         if message.photo:
             path = await message.download_media()
             print('File saved to', path)
-        
+
 with client:
     client.loop.run_until_complete(main())
