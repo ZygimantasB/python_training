@@ -11,8 +11,10 @@
 *.ddb
 *.xml
 *.iml
-session_name.session
+*.session
 .env
+telegram_download
+
 
 ### venv template
 # Virtualenv
