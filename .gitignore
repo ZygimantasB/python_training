@@ -12,6 +12,7 @@
 *.xml
 *.iml
 session_name.session
+.env
 
 ### venv template
 # Virtualenv
