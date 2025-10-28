@@ -15,8 +15,4 @@ base_download_dir = Path(os.getenv("TELEGRAM_DOWNLOAD_DIR", "telegram_download")
 client = TelegramClient(session_name, api_id, api_hash)
 
 async def main():
-    print('Starting client...')
-
-
-
-    
+    print()

@@ -21,8 +21,18 @@ async def main():
     # result_coffe = brew_coffee()
     # result_bagel = toast_bagel()
 
-    batch = asyncio.gather(brew_coffee(), toast_bagel())
-    result_coffe, result_bagel = await batch
+    # First approach
+
+    # batch = asyncio.gather(brew_coffee(), toast_bagel())
+    # result_coffe, result_bagel = await batch
+
+    # second approach
+
+    coffe_task = asyncio.create_task(brew_coffee())
+    toast_bagel_task = asyncio.create_task(toast_bagel())
+
+    result_coffe = await coffe_task
+    result_bagel = await toast_bagel_task
 
     end_time = time.time()
     elapsed_time = end_time - start_time
