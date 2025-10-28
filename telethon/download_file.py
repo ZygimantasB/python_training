@@ -71,7 +71,6 @@ async def download_from_dialog(entity, dialog_name: str) -> None:
     logger.info("Scanning messages in '%s'...", dialog_name)
 
     async for message in client.iter_messages(entity):
-        # Only messages that actually contain downloadable files/media
         if not message.file:
             continue
         if message.id in downloaded:
