@@ -1,4 +1,5 @@
 import asyncio
+import re
 import polars as pl
 
 from pprint import pprint
@@ -8,7 +9,7 @@ from decouple import config
 api_id = config("telegram_api_id")
 api_hash = config("telegram_api_hash")
 
-client = TelegramClient('session_name', api_id=api_id, api_hash=api_hash)
+client = TelegramClient('telegram_session_tarnybinis', api_id=api_id, api_hash=api_hash)
 
 async def main():
 
@@ -26,29 +27,53 @@ async def main():
         # print(me.status)
         # print(me.usernames)
 
-        target_dialog_title = "SKELBIMAI"
+        target_dialog_title = config("telegram_group_name")
         messages_data = []
+        telegram_channels = []
+        boxed_pw_pass_regex = r'```\s*([^\s`]+)\s*```'
+
 
         async for dialog in client.iter_dialogs():
+            # telegram_channels.append({
+            #     'dialog_id': dialog.id,
+            #     'dialog_title': dialog.title,
+            #     # 'dialog_entity': dialog.entity,
+            # })
+            # pl.DataFrame(telegram_channels).write_csv('telegram_channels.csv')
+
             # print(dialog.title)
             # print(dialog.id)
             if dialog.title == target_dialog_title:
                 # print(f' Messages from {dialog.title}:')
 
                 async for message in client.iter_messages(dialog.entity, limit=10):
+
+                    pass_match = re.search(boxed_pw_pass_regex, message.text) if message.text else None
+
                     messages_data.append({
                         'message_id': message.id,
-                        'sender': message.sender.username,
-                        'sender_id': message.sender.id,
-                        'date': message.date,
+                        'sender': message.sender.username if message.sender else None,
+                        'sender_id': message.sender.id if message.sender else None,
+                        'date': message.date.isoformat() if message.date else None,
                         'message': message.text,
-                        'has_photo': message.photo,
-                        'has_video': message.video,
-                        'has_document': message.document,
-                        'has_sticker': message.sticker,
-                        'dice': message.dice,
+                        'has_photo': bool(message.photo),
+                        'has_video': bool(message.video),
+                        'has_document': bool(message.document),
+                        'has_sticker': bool(message.sticker),
+                        'dice': bool(message.dice),
+                        'media': bool(message.media),
+                        'file': bool(message.file),
+                        'file_size': message.file.size if message.file else None,
+                        'file_title': message.file.title if message.file else None, # Useless
+                        'file_duration': message.file.duration if message.file else None, # Useless
+                        'web_preview': bool(message.web_preview),
+                        'voice': bool(message.voice),
+                        'raw_text': message.raw_text,
+                        'file_name': message.file.name if message.file else None,
+                        'pass_value': pass_match.group(1) if pass_match else None,
                     })
-                print(f'Message ID {message.id}:')
+
+                    # print(f'Message ID {message.id}:')
         #             print(f'Message textr {message.text}:')
         #             print(f'Date {message.date}:')
         #             print(f'Message text {message.text}:')
@@ -63,7 +88,7 @@ async def main():
         #                 print(" [Has document")
         #             if message.sticker:
         #                 print(" [Has sticker")
-                print(pl.DataFrame(messages_data))
+                print(pl.DataFrame(messages_data).write_csv('telegram_test_data.csv'))
         # # return me
 
 

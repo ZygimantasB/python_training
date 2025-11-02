@@ -14,7 +14,8 @@
 *.session
 .env
 telegram_download
-
+.env.me
+testing_data.ipynb
 
 ### venv template
 # Virtualenv
