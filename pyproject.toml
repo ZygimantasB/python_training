@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "dotenv>=0.9.9",
     "notebook>=7.4.7",
+    "polars>=1.35.1",
     "python-decouple>=3.8",
     "python-dotenv>=1.2.1",
     "telethon>=1.41.2",
