@@ -1,6 +1,7 @@
 import asyncio
 import re
 import polars as pl
+import os
 
 from pprint import pprint
 from telethon import TelegramClient, events
@@ -10,6 +11,11 @@ api_id = config("telegram_api_id")
 api_hash = config("telegram_api_hash")
 
 client = TelegramClient('telegram_session_tarnybinis', api_id=api_id, api_hash=api_hash)
+
+def sanitize_filename(name):
+    name = re.sub(r'[<>:"/\\|?*]', '', name)
+    name = re.sub(r'\s+', ' ', name)
+    return name.strip()
 
 async def main():
 
@@ -34,6 +40,16 @@ async def main():
 
 
         async for dialog in client.iter_dialogs():
+            chanel_name = dialog.name
+            chanel_id = dialog.id
+
+            safe_name = sanitize_filename(chanel_name)
+
+            download_folder = f"telegram_download/{safe_name}"
+
+
+            os.makedirs(download_folder, exist_ok=True)
+
             # telegram_channels.append({
             #     'dialog_id': dialog.id,
             #     'dialog_title': dialog.title,
@@ -48,30 +64,30 @@ async def main():
 
                 async for message in client.iter_messages(dialog.entity, limit=10):
 
-                    pass_match = re.search(boxed_pw_pass_regex, message.text) if message.text else None
-
-                    messages_data.append({
-                        'message_id': message.id,
-                        'sender': message.sender.username if message.sender else None,
-                        'sender_id': message.sender.id if message.sender else None,
-                        'date': message.date.isoformat() if message.date else None,
-                        'message': message.text,
-                        'has_photo': bool(message.photo),
-                        'has_video': bool(message.video),
-                        'has_document': bool(message.document),
-                        'has_sticker': bool(message.sticker),
-                        'dice': bool(message.dice),
-                        'media': bool(message.media),
-                        'file': bool(message.file),
-                        'file_size': message.file.size if message.file else None,
-                        'file_title': message.file.title if message.file else None, # Useless
-                        'file_duration': message.file.duration if message.file else None, # Useless
-                        'web_preview': bool(message.web_preview),
-                        'voice': bool(message.voice),
-                        'raw_text': message.raw_text,
-                        'file_name': message.file.name if message.file else None,
-                        'pass_value': pass_match.group(1) if pass_match else None,
-                    })
+                    # pass_match = re.search(boxed_pw_pass_regex, message.text) if message.text else None
+                    #
+                    # messages_data.append({
+                    #     'message_id': message.id,
+                    #     'sender': message.sender.username if message.sender else None,
+                    #     'sender_id': message.sender.id if message.sender else None,
+                    #     'date': message.date.isoformat() if message.date else None,
+                    #     'message': message.text,
+                    #     'has_photo': bool(message.photo),
+                    #     'has_video': bool(message.video),
+                    #     'has_document': bool(message.document),
+                    #     'has_sticker': bool(message.sticker),
+                    #     'dice': bool(message.dice),
+                    #     'media': bool(message.media),
+                    #     'file': bool(message.file),
+                    #     'file_size': message.file.size if message.file else None,
+                    #     'file_title': message.file.title if message.file else None, # Useless
+                    #     'file_duration': message.file.duration if message.file else None, # Useless
+                    #     'web_preview': bool(message.web_preview),
+                    #     'voice': bool(message.voice),
+                    #     'raw_text': message.raw_text,
+                    #     'file_name': message.file.name if message.file else None,
+                    #     'pass_value': pass_match.group(1) if pass_match else None,
+                    # })
 
                     # print(f'Message ID {message.id}:')
         #             print(f'Message textr {message.text}:')
@@ -88,7 +104,17 @@ async def main():
         #                 print(" [Has document")
         #             if message.sticker:
         #                 print(" [Has sticker")
-                print(pl.DataFrame(messages_data).write_csv('telegram_test_data.csv'))
+
+        #         print(pl.DataFrame(messages_data).write_csv('telegram_test_data.csv'))
+
+                    if message.photo:
+                        # path = await message.download_media(file="telegram_download")
+                        path = await message.download_media(download_folder)
+
+                        print('File saved to', path)
+                    # if message.file:
+                    #     path = await message.download_media(file="telegram_download")
+                    #     print('File saved to', path)
         # # return me
 
 

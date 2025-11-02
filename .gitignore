@@ -12,10 +12,12 @@
 *.xml
 *.iml
 *.session
-.env
 telegram_download
-.env.me
 testing_data.ipynb
+.env*
+*.ipynb
+*.jpg
+*.session-journal
 
 ### venv template
 # Virtualenv
