@@ -7,8 +7,8 @@ from pprint import pprint
 from telethon import TelegramClient, events
 from decouple import config
 
-api_id = config("telegram_api_id")
-api_hash = config("telegram_api_hash")
+api_id = config("TELEGRAM_API_ID")
+api_hash = config("TELEGRAM_APP_API_HASH")
 
 client = TelegramClient('telegram_session_tarnybinis', api_id=api_id, api_hash=api_hash)
 

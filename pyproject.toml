@@ -8,6 +8,7 @@ dependencies = [
     "notebook>=7.4.7",
     "pandas>=2.3.3",
     "polars>=1.35.1",
+    "pylint>=4.0.2",
     "python-decouple>=3.8",
     "python-dotenv>=1.2.1",
     "telethon>=1.41.2",
