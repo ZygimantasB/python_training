@@ -36,7 +36,7 @@ async def main():
         target_dialog_title = config("telegram_group_name")
         messages_data = []
         telegram_channels = []
-        boxed_pw_pass_regex = r'```\s*([^\s`]+)\s*```'
+        pass_regex = r'```\s*([^\s`]+)\s*```'
 
 
         async for dialog in client.iter_dialogs():
@@ -120,3 +120,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

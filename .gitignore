@@ -18,6 +18,7 @@ testing_data.ipynb
 *.ipynb
 *.jpg
 *.session-journal
+download_data_website.py
 
 ### venv template
 # Virtualenv
