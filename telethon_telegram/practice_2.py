@@ -9,8 +9,9 @@ from decouple import config
 
 api_id = config("TELEGRAM_API_ID")
 api_hash = config("TELEGRAM_APP_API_HASH")
+telegram_session = config('TELEGRAM_SESSION')
 
-client = TelegramClient('telegram_session_tarnybinis', api_id=api_id, api_hash=api_hash)
+client = TelegramClient(telegram_session, api_id=api_id, api_hash=api_hash)
 
 def sanitize_filename(name):
     name = re.sub(r'[<>:"/\\|?*]', '', name)
@@ -33,7 +34,7 @@ async def main():
         # print(me.status)
         # print(me.usernames)
 
-        target_dialog_title = config("telegram_group_name")
+        target_dialog_title = config("CHANNEL_NAME")
         messages_data = []
         telegram_channels = []
         pass_regex = r'```\s*([^\s`]+)\s*```'
@@ -112,10 +113,10 @@ async def main():
                         path = await message.download_media(download_folder)
 
                         print('File saved to', path)
-                    # if message.file:
-                    #     path = await message.download_media(file="telegram_download")
-                    #     print('File saved to', path)
-        # # return me
+                    if message.file:
+                        path = await message.download_media(file="telegram_download")
+                        print('File saved to', path)
+        # return me
 
 
 if __name__ == "__main__":

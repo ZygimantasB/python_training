@@ -13,6 +13,7 @@
 *.iml
 *.session
 telegram_download
+telegram_downloads
 testing_data.ipynb
 .env*
 *.ipynb

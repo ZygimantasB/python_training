@@ -7,9 +7,6 @@ import polars as pl
 
 from decouple import config
 from telethon import TelegramClient, events
-
-from telethon_telegram.practice_2 import client
-from telethon_telegram.practice_3 import target_channel
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -79,3 +76,4 @@ if __name__ == '__main__':
     )
 
     asyncio.run(scraper.run())
+
