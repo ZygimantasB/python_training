@@ -1,7 +1,7 @@
 import os
 import asyncio
 import re
-import polars as pl
+import csv
 import logging
 import time
 from telethon import TelegramClient
@@ -11,6 +11,7 @@ from decouple import config
 from typing import Dict, List, Optional
 
 
+# --- Logging setup is unchanged ---
 file_handler = logging.FileHandler('scraper.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -30,13 +31,49 @@ class TelegramScraper:
             api_hash=api_hash,
         )
         self.target_channel = target_channel
-        self.telegram_messages = []
         self.csv_file = csv_file
         self.download_folder = download_folder
         self.pass_regex = r'```\s*([^\s`]+)\s*```'
 
+        # CHANGED: Define the CSV headers in one place
+        self.csv_fieldnames = [
+            'channel_name', 'channel_id', 'sender_name', 'sender_id', 'date',
+            'message_id', 'message', 'raw_text', 'file_name', 'file_size', 'pass_value'
+        ]
+
         os.makedirs(self.download_folder, exist_ok=True)
         logging.info(f'Download folder set to {self.download_folder}')
+
+        # CHANGED: Create the CSV and write headers if it doesn't exist
+        self._init_csv()
+
+    def _init_csv(self):
+        """Creates the CSV file with headers if it doesn't exist."""
+        try:
+            # Check if file is empty
+            file_exists = os.path.isfile(self.csv_file) and os.path.getsize(self.csv_file) > 0
+            if not file_exists:
+                with open(self.csv_file, mode='w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=self.csv_fieldnames)
+                    writer.writeheader()
+                logging.info(f"Initialized CSV file with headers: {self.csv_file}")
+        except Exception as e:
+            logging.error(f"Failed to initialize CSV file: {e}")
+            print(f"ERROR: Failed to initialize CSV file: {e}")
+
+    def _append_to_csv(self, message_data: Dict):
+        """Appends a single message's data to the CSV file."""
+        try:
+            with open(self.csv_file, mode='a', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=self.csv_fieldnames)
+                writer.writerow(message_data)
+            # Log to file
+            logging.info(f"Appended message {message_data['message_id']} to CSV.")
+            # Print to terminal
+            print(f"Saved info for message {message_data['message_id']} to CSV.")
+        except Exception as e:
+            logging.error(f"Failed to append message {message_data['message_id']} to CSV: {e}")
+            print(f"ERROR: Failed to save message {message_data['message_id']} to CSV: {e}")
 
     def _parse_messages(self, message, channel_name, channel_id):
         """Helper function to parse a single message object into a dictionary."""
@@ -65,10 +102,8 @@ class TelegramScraper:
             'pass_value': pass_regex.group(1) if pass_regex else None,
         }
 
-    async def fetch_messages(self, limit: Optional[int] = 100) -> List[Dict]:
-        """Fetches messages and downloads files from the target channel."""
-
-        messages_list: List[Dict] = []
+    async def fetch_messages(self, limit: Optional[int] = 100) -> None: # CHANGED: No return value
+        """Fetches, saves, and downloads messages one by one."""
 
         logging.info(f"Connecting to Telegram...")
         print(f"Connecting to Telegram...")
@@ -80,11 +115,15 @@ class TelegramScraper:
                 print(f"Found channel: {entity.title}")
 
                 async for message in self.telegram_client.iter_messages(entity, limit=limit):
+                    # 1. Parse the message data
                     parsed_data = self._parse_messages(
                         message=message, channel_name=entity.title, channel_id=entity.id
                     )
-                    messages_list.append(parsed_data)
 
+                    # 2. Append data to CSV *BEFORE* downloading
+                    self._append_to_csv(parsed_data)
+
+                    # 3. Download the file (if it exists)
                     if message.file:
                         file_name = message.file.name or f"file_{message.id}"
                         try:
@@ -104,7 +143,7 @@ class TelegramScraper:
                                 progress_callback=progress_func,
                             )
 
-                            print()
+                            print() # Newline after progress bar
 
                             logging.info(f"Successfully downloaded: {file_name}")
 
@@ -123,34 +162,16 @@ class TelegramScraper:
             except Exception as e:
                 logging.error(f"An unexpected error occurred: {e}")
 
-        logging.info(f"Finished fetching. Found {len(messages_list)} messages.")
-        print(f"Finished fetching. Found {len(messages_list)} messages.") # Also print
-        return messages_list
+        logging.info(f"Finished fetching messages.")
+        print(f"Finished fetching messages.")
+        # REMOVED: return messages_list
 
-
-    def save_to_csv(self, messages: List[Dict]) -> None:
-        """Saves the list of message dictionaries to a CSV file."""
-        if not messages:
-            logging.warning("No messages to save. Skipping CSV creation.")
-            print("No messages to save. Skipping CSV creation.")
-            return
-
-        try:
-            csv_directory = os.path.dirname(self.csv_file)
-            if csv_directory:
-                os.makedirs(csv_directory, exist_ok=True)
-
-            df = pl.DataFrame(messages)
-            df.write_csv(self.csv_file)
-            logging.info(f"Successfully saved data to {self.csv_file}")
-            print(f"Successfully saved data to {self.csv_file}")
-        except Exception as e:
-            logging.error(f"Failed to save data to CSV: {e}")
-            print(f"ERROR: Failed to save data to CSV: {e}")
+    # REMOVED: save_to_csv method is no longer needed
 
     def _get_progress_callback(self, file_name: str):
         """
         Returns a callback function to show download progress in the terminal and log file.
+        (This is your advanced function, left unchanged)
         """
         start_time = time.time()
         last_log_time = start_time
@@ -211,11 +232,10 @@ class TelegramScraper:
         return progress_callback
 
 
-
     async def run(self, limit: Optional[int] = 100):
         """Main execution flow."""
-        messages = await self.fetch_messages(limit=limit)
-        self.save_to_csv(messages)
+        # CHANGED: No return value, no save_to_csv call
+        await self.fetch_messages(limit=limit)
 
 
 if __name__ == '__main__':
@@ -246,3 +266,4 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(f"An error occurred in main: {e}")
         print(f"FATAL ERROR: {e}. Check scraper.log.")
+

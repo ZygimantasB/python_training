@@ -1,0 +1,122 @@
+import os
+import re
+import logging
+import asyncio
+import sqlite3
+
+from telethon import TelegramClient
+from decouple import config
+from typing import Dict, List, Optional
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class TelegramScraper:
+
+    def __init__(self, api_id: int, api_hash: str, session_name: str, target_channel: str, download_folder: str = 'telegram_downloads'):
+
+        self.client = TelegramClient(session_name, api_id, api_hash)
+        self.target_channel = target_channel
+        self.download_folder = download_folder
+        self.pass_regex = r'```\s*([^\s`]+)\s*```'
+        self.messages = []
+
+    def _parse_messages(self, message, channel_name: str, channel_id: str) -> Dict[str, str]:
+        match = re.search(self.pass_regex, message.text) if message.text else None
+
+        pass_match_text = match.group(1) if match else None
+
+        return {
+            'channel_name': channel_name,
+            'channel_id': channel_id,
+            'message_id': message.id,
+            'sender': message.sender.username if message.sender else None,
+            'message_text': message.text,
+            'message_raw_text': message.raw_text,
+            'message_date': message.date.isoformat() if message.date else None,
+            'file_name': message.file.name if message.file else None,
+            'file_size': message.file.size if message.file else None,
+            'pass_match': pass_match_text
+        }
+
+    async def _fetch_messages(self, limit=10):
+        try:
+            entity = await self.client.get_entity(self.target_channel)
+            logging.info(f"Found channel: {entity.title}")
+        except ValueError:
+            logging.info(f"Channel not found: {self.target_channel}")
+            return
+        except Exception as e:
+            logging.error(f"Error while fetching messages: {self.target_channel} {e}")
+
+        async for message in self.client.iter_messages(self.target_channel, limit=limit):
+            logging.info(f"Found message: {message.id}")
+            parse_data = self._parse_messages(message, entity.title, entity.id)
+            self.messages.append(parse_data)
+
+
+    def save_to_sqlite(self, db_name: str = 'telegra_messages.db', table_name: str = 'messages'):
+
+        if not self.messages:
+            logging.info(f"No messages found for channel: {self.target_channel}")
+            return
+
+        db_path = os.path.join(self.download_folder, db_name)
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+        conn = None
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(f"""
+                            CREATE TABLE IF NOT EXISTS {table_name} (
+                                CHANNEL_NAME TEXT,
+                                CHANNEL_ID TEXT,
+                                MESSAGE_ID INTEGER,
+                                SENDER TEXT,
+                                MESSAGE_TEXT TEXT,
+                                MESSAGE_RAW_TEXT TEXT,
+                                MESSAGE_DATE TEXT,
+                                FILE_NAME TEXT,
+                                FILE_SIZE INTEGER,
+                                PASS_MATCH TEXT
+                            )
+                        """)
+
+            cols = self.messages[0].keys()
+            placeholders = ", ".join(["?"] * len(cols))
+
+            data_to_insert = [tuple(msg[col] for col in cols) for msg in self.messages]
+
+            insert_query = f"INSERT OR IGNORE INTO {table_name} ({', '.join(cols)}) VALUES ({placeholders})"
+
+            cursor.executemany(insert_query, data_to_insert)
+            conn.commit()
+
+        except sqlite3.Error as e:
+            logging.error(f"Error while saving messages: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def run(self):
+        async with self.client:
+            await self._fetch_messages(limit=20)
+        self.save_to_sqlite(db_name='telegram_messages.db', table_name='messages')
+
+if '__main__' == __name__:
+
+    api_id = config('TELEGRAM_API_ID')
+    api_hash = config('TELEGRAM_APP_API_HASH')
+    session_name = config('TELEGRAM_SESSION')
+    target_channel = config('CHANNEL_NAME')
+
+    scraper = TelegramScraper(
+        api_id=api_id,
+        api_hash=api_hash,
+        session_name=session_name,
+        target_channel=target_channel,
+        download_folder='telegram_downloads'
+    )
+
+    asyncio.run(scraper.run())
