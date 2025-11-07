@@ -103,7 +103,8 @@ class TelegramScraper:
                                 MESSAGE_DATE TEXT,
                                 FILE_NAME TEXT,
                                 FILE_SIZE INTEGER,
-                                PASS_MATCH TEXT
+                                PASS_MATCH TEXT,
+                                UNIQUE(CHANNEL_ID, MESSAGE_ID)
                             )
                         """)
 
@@ -124,7 +125,21 @@ class TelegramScraper:
             if conn:
                 conn.close()
 
-    async def _download_files(self):
+    async def _download_worker(self, semaphore: asyncio.Semaphore, message, download_path: str):
+        async with semaphore:
+            try:
+                file_name = message.file.name if message.file and message.file.name else f'media_from_message_{message.id}'
+                full_path = os.path.join(download_path, file_name)
+                if os.path.exists(full_path):
+                    logging.info(f'File {file_name} already exists in {download_path}')
+                    return
+                logging.info(f'Starting download {file_name}')
+                await message.download_media(file=download_path)
+                logging.info(f'Successfully downloaded file {file_name}')
+            except Exception as e:
+                logging.error(f'Failed to download file: {message.id} {e}')
+
+    async def _download_files(self, concurrent_limit: int = 4):
         if not self.messages:
             logging.info(f"No messages found for channel: {self.target_channel}")
             return
@@ -136,26 +151,32 @@ class TelegramScraper:
         safe_channel_name = self._sanitize_filename(self.entity.title)
         channel_download_path = os.path.join(self.download_folder, safe_channel_name)
         os.makedirs(channel_download_path, exist_ok=True)
-        logging.info(f"Saving files to {channel_download_path}")
+
+        sem = asyncio.Semaphore(concurrent_limit)
+        tasks = []
+
+        logging.info(f"Queuing {len(self.messages)} messages for download with limit {concurrent_limit}...")
 
         for message in self.messages:
             if message.media:
-                try:
-                    file_name = message.file.name if message.file and message.file.name else f"media_from_message_{message.id}"
-                    logging.info(f'Attempting to download file {file_name}')
+                task = asyncio.create_task(
+                    self._download_worker(sem, message, channel_download_path)
+                )
+                tasks.append(task)
 
-                    downloaded_path = await message.download_media(file=channel_download_path)
-
-                    logging.info(f'Successfully downloaded file {file_name}')
-                except Exception as e:
-                    logging.error(f'Failed to download the file from message {message.id} {e}')
+        if tasks:
+            await asyncio.gather(*tasks)
+            logging.info('All downloads completed')
+        else:
+            logging.info("No media found in fetched messages.")
 
 
     async def run(self):
         async with self.client:
             await self._fetch_messages(limit=20)
-            self.save_to_sqlite(db_name='telegram_messages.db', table_name='messages')
-            await self._download_files()
+            if self.entity:
+                self.save_to_sqlite(db_name='telegram_messages.db', table_name='messages')
+                await self._download_files(concurrent_limit=4)
 
 if '__main__' == __name__:
 
@@ -163,6 +184,10 @@ if '__main__' == __name__:
     api_hash = config('TELEGRAM_APP_API_HASH')
     session_name = config('TELEGRAM_SESSION')
     target_channel = config('CHANNEL_NAME')
+
+    if not all([api_id, api_hash, target_channel]):
+        logger.error("Missing environment variables. Please check your .env file.")
+        exit(1)
 
     scraper = TelegramScraper(
         api_id=api_id,
